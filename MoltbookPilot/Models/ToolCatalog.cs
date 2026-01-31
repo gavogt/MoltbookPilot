@@ -1,6 +1,4 @@
-﻿using MoltbookPilot.Models;
-
-namespace MoltbookPilot;
+﻿namespace MoltbookPilot.Models;
 
 public static class ToolCatalog
 {

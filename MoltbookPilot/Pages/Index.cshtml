@@ -58,6 +58,12 @@
         <button class="btn btn-neo cyan" type="button" onclick="refreshState()">Refresh State</button>
         <pre id="stateOut" class="out">// state refresh output...</pre>
     </div>
+
+    <div class="card glow2" style="margin-top:14px;">
+        <h2>Heartbeats</h2>
+        <button class="btn-neo" type="button" id="heartbeatBtn">Run Heartbeat</button>
+        <pre id="heartbeatOut" class="out">// heartbeat output will show here…</pre>
+    </div>
 </section>
 
 @section Scripts {
@@ -137,5 +143,19 @@
             out.textContent = 'Error: ' + e;
           }
         }
+
+        document.getElementById('heartbeatBtn').addEventListener('click', async () => {
+          const out = document.getElementById('heartbeatOut');
+          out.textContent = 'Running heartbeat…';
+          try {
+            const r = await fetch('/api/moltbook/heartbeat', { method: 'POST' });
+            out.textContent = await r.text();
+            if(typeof refreshState === 'function') {
+              await refreshState();
+            }
+          } catch (e) {
+            out.textContent = 'Error: ' + e;
+          }
+        });
     </script>
 }

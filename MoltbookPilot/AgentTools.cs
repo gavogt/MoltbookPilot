@@ -5,11 +5,15 @@ namespace MoltbookPilot;
 
 public sealed class AgentTools(HttpClient http)
 {
-    private static readonly string[] AllowedHosts =
-    [
-        "www.moltbook.com",
-        "moltbook.com"
-    ];
+    private string? _moltbookAgentApiKey;
+
+    public void SetMoltbookApiKey(string? apiKey)
+    {
+        _moltbookAgentApiKey = apiKey;
+    }
+
+    private static readonly HashSet<string> AllowedHosts =
+        new(StringComparer.OrdinalIgnoreCase) { "www.moltbook.com", "moltbook.com" };
 
     private static void EnsureAllowed(string url)
     {
@@ -22,28 +26,41 @@ public sealed class AgentTools(HttpClient http)
 
     public async Task<string> HttpGetAsync(string url, CancellationToken ct)
     {
-        EnsureAllowed(url);
-        using var req = new HttpRequestMessage(HttpMethod.Get, url);
-        var resp = await http.SendAsync(req, ct);
+        var target = NormalizeMoltbookUrl(url);
+        EnsureAllowed(target.ToString());
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, target);
+        AddMoltbookAuthIfNeeded(req);
+
+        using var resp = await http.SendAsync(req, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
 
         return $"Status: {(int)resp.StatusCode}\n{Trim(body)}";
     }
 
-    public async Task<string> HttpPostJsonAsync(string url, JsonElement jsonBody, Dictionary<string, string>? headers, CancellationToken ct)
+    public async Task<string> HttpPostJsonAsync(
+     string url,
+     JsonElement jsonBody,
+     Dictionary<string, string>? headers,
+     CancellationToken ct)
     {
-        EnsureAllowed(url);
+        var target = NormalizeMoltbookUrl(url);
+        EnsureAllowed(target.ToString());
 
-        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        using var req = new HttpRequestMessage(HttpMethod.Post, target);
+
         if (headers is not null)
-        {
             foreach (var kv in headers)
                 req.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
-        }
 
-        req.Content = new StringContent(JsonSerializer.Serialize(jsonBody), Encoding.UTF8, "application/json");
+        AddMoltbookAuthIfNeeded(req);
 
-        var resp = await http.SendAsync(req, ct);
+        req.Content = new StringContent(
+            JsonSerializer.Serialize(jsonBody),
+            Encoding.UTF8,
+            "application/json");
+
+        using var resp = await http.SendAsync(req, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
 
         return $"Status: {(int)resp.StatusCode}\n{Trim(body)}";
@@ -51,4 +68,33 @@ public sealed class AgentTools(HttpClient http)
 
     private static string Trim(string s)
         => s.Length <= 4000 ? s : s[..4000] + "\n...[trimmed]";
+
+    private void AddMoltbookAuthIfNeeded(HttpRequestMessage req)
+    {
+        if (_moltbookAgentApiKey is null) return;
+
+        var host = req.RequestUri?.Host?.ToLowerInvariant();
+
+        if (host is "moltbook.com" or "www.moltbook.com")
+        {
+            req.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _moltbookAgentApiKey);
+        }
+    }
+
+    private static Uri NormalizeMoltbookUrl(string url)
+    {
+        var uri = new Uri(url);
+
+        if (uri.Host.Equals("moltbook.com", StringComparison.OrdinalIgnoreCase))
+        {
+            var builder = new UriBuilder(uri)
+            {
+                Host = "www.moltbook.com"
+            };
+            return builder.Uri;
+        }
+
+        return uri;
+    }
 }

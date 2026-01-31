@@ -20,6 +20,9 @@ builder.Services.AddDbContext<MoltbookDbContext>(options =>
 builder.Services.AddHttpClient<AgentTools>();
 builder.Services.AddScoped<MoltbookJoinService>();
 builder.Services.AddScoped<MoltbookStateStore>();
+builder.Services.AddScoped<MoltbookHeartbeatRunner>();
+builder.Services.AddHostedService<MoltbookHeartbeatHostedService>();
+
 
 var app = builder.Build();
 
@@ -110,5 +113,14 @@ static string? ExtractApiKey(string text)
     return m.Success ? m.Groups[1].Value : null;
 }
 
+app.MapPost("/api/moltbook/heartbeat", async (
+    MoltbookPilot.Services.MoltbookHeartbeatRunner runner,
+    IConfiguration cfg,
+    CancellationToken ct) =>
+{
+    var model = cfg["Agent:Model"] ?? "qwen/qwen3-coder-30b";
+    var text = await runner.RunOnceAsync(model, ct);
+    return Results.Ok(text);
+});
 
 app.Run();

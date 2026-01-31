@@ -37,13 +37,25 @@ namespace MoltbookPilot.Services
             await db.SaveChangesAsync(ct);
         }
 
-        public async Task UpdateHeartbeatAsync(CancellationToken ct = default)
+        public async Task SetLastHeartbeatUtcAsync(DateTime whenUtc, CancellationToken ct = default)
         {
-            var row = await GetOrCreateAsync(ct);
-            row.LastHeartbeatUtc = DateTime.UtcNow;
-            row.UpdatedUtc = DateTime.UtcNow;
+            var state = await GetOrCreateAsync(ct); 
+            state.LastHeartbeatUtc = whenUtc;
+            state.UpdatedUtc = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
         }
+
+        public async Task SaveRegistrationAsync(string agentHandle, string claimURL, string apiKey, CancellationToken ct = default)
+        {
+            var row = await GetOrCreateAsync(ct);
+            row.AgentHandle = agentHandle;
+            row.ClaimUrl = claimURL;
+            row.AgentApiKey = apiKey;
+            row.UpdatedUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+
+        }
+
 
     }
 }

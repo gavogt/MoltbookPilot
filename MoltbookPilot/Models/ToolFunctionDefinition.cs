@@ -1,4 +1,4 @@
-﻿namespace MoltbookPilot
+﻿namespace MoltbookPilot.Models
 {
     public class ToolFunctionDefinition
     {

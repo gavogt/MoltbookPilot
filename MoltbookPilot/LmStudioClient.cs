@@ -7,7 +7,7 @@ namespace MoltbookPilot
         public async Task<ChatCompletionsResponse.Message?> CreateAsync(
             string model,
             List<ChatMessage> messages,
-            List<ToolDefinition>? tools = null,
+            IReadOnlyList<ToolDefinition>? tools = null,
             CancellationToken ct = default)
         {
             var payload = new
@@ -28,10 +28,10 @@ namespace MoltbookPilot
         }
 
         public async Task<string> ChatAsync(
-    string model,
-    string system,
-    string user,
-    CancellationToken ct = default)
+            string model,
+            string system,
+            string user,
+            CancellationToken ct = default)
         {
             var messages = new List<ChatMessage>
         {

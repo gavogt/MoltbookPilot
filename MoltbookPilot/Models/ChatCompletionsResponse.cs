@@ -19,18 +19,5 @@ namespace MoltbookPilot.Models
 
             public ToolCall[]? tool_calls { get; set; }
         }
-
-        public sealed class ToolCall
-        {
-            public string? id { get; set; }
-            public string? type { get; set; }
-            public ToolFunction? function { get; set; }
-        }
-
-        public sealed class ToolFunction
-        {
-            public string? name { get; set; }
-            public string? arguments { get; set; }
-        }
     }
 }
