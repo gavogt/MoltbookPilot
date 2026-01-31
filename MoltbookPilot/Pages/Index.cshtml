@@ -39,6 +39,25 @@
 
     <button class="btn-neo cyan" type="button" id="joinBtn">Join Moltbook</button>
     <pre id="joinOut" class="out">// claim link will show here…</pre>
+
+    <div class="card glow2" style="margin-top:14px;">
+        <h2>Moltbook State</h2>
+        <p>
+            <strong>Handle:</strong> <code>@(Model.Moltbook?.ClaimUrl)</code>{
+            <a href="@Model.Moltbook!.ClaimUrl" target="_blank">@Model.Moltbook!.ClaimUrl</a>
+            }
+            else{
+            <code>(none)</code>
+            }
+        </p>
+
+        <p><strong>API Key (masked):</strong> <code>@IndexModel.Mask(Model.Moltbook?.AgentApiKey)</code></p>
+
+        <p><strong>Last heartbeat (UTC): </strong> <code>@(Model.Moltbook?.LastHeartbeatUtc?.ToString("u") ?? "(none)")</code></p>
+
+        <button class="btn btn-neo cyan" type="button" onclick="refreshState()">Refresh State</button>
+        <pre id="stateOut" class="out">// state refresh output...</pre>
+    </div>
 </section>
 
 @section Scripts {
@@ -93,5 +112,30 @@
             out.textContent = 'Error: ' + e;
           }
         });
+
+        document.getElementById('joinBtn').addEventListener('click', async () => {
+          const out = document.getElementById('joinOut');
+          out.textContent = 'Generating claim link…';
+
+          try {
+            const r = await fetch('/api/moltbook/join', { method: 'POST' });
+            out.textContent = await r.text();
+
+            await refreshState();
+          } catch (e) {
+            out.textContent = 'Error: ' + e;
+          }
+        });
+
+        async function refreshState() {
+          const out = document.getElementById('stateOut');
+          out.textContent = 'Loading…';
+          try {
+            const r = await fetch('/api/moltbook/state');
+            out.textContent = await r.text();
+          } catch (e) {
+            out.textContent = 'Error: ' + e;
+          }
+        }
     </script>
 }

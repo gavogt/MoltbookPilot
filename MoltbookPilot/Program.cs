@@ -1,4 +1,7 @@
 using MoltbookPilot;
+using Microsoft.EntityFrameworkCore;
+using MoltbookPilot.Data;
+using MoltbookPilot.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,8 +14,12 @@ builder.Services.AddHttpClient<LmStudioClient>(http =>
     http.BaseAddress = new Uri("http://localhost:1234");
 });
 
+builder.Services.AddDbContext<MoltbookDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MoltbookPilotDb")));
+
 builder.Services.AddHttpClient<AgentTools>();
 builder.Services.AddScoped<MoltbookJoinService>();
+builder.Services.AddScoped<MoltbookStateStore>();
 
 var app = builder.Build();
 
@@ -58,12 +65,51 @@ app.MapPost("/api/agent/think", async (ThinkRequest req, LmStudioClient lm) =>
     return Results.Ok(text);
 });
 
-app.MapPost("/api/moltbook/join", async (MoltbookJoinService svc, CancellationToken ct) =>
+app.MapGet("/api/moltbook/state", async (MoltbookPilot.Services.MoltbookStateStore store, CancellationToken ct) =>
 {
-    // Use whichever model name LM Studio shows in /v1/models
-    var model = "your-model-id-here";
-    var result = await svc.JoinAsync(model, ct);
-    return Results.Ok(result);
+    var s = await store.GetOrCreateAsync(ct);
+    return Results.Ok(new
+    {
+        s.AgentHandle,
+        s.ClaimUrl,
+        AgentApiKeyMasked = MoltbookPilot.Pages.IndexModel.Mask(s.AgentApiKey),
+        s.LastHeartbeatUtc
+    });
 });
+
+app.MapPost("/api/moltbook/join", async (
+    MoltbookJoinService joinSvc,
+    MoltbookStateStore store,
+    CancellationToken ct) =>
+{
+    var model = "your-model-id";
+    var resultText = await joinSvc.JoinAsync(model, ct);
+
+    // Parse what we can from the text (claim url + key)
+    var claimUrl = ExtractFirstUrl(resultText);
+    var apiKey = ExtractApiKey(resultText);
+
+    if (!string.IsNullOrWhiteSpace(claimUrl))
+        await store.SaveClaimAsync(claimUrl, ct);
+
+    if (!string.IsNullOrWhiteSpace(apiKey))
+        await store.SaveApiKeyAsync(apiKey, ct);
+
+    return Results.Ok(resultText);
+});
+
+static string? ExtractFirstUrl(string text)
+{
+    var m = System.Text.RegularExpressions.Regex.Match(text, @"https?://\S+");
+    return m.Success ? m.Value.TrimEnd(')', '.', ',', ';') : null;
+}
+
+static string? ExtractApiKey(string text)
+{
+    // example patterns: "molt_" or "moltb_" etc—adjust once you see it
+    var m = System.Text.RegularExpressions.Regex.Match(text, @"\b(molt[a-zA-Z0-9_\-]{10,})\b");
+    return m.Success ? m.Groups[1].Value : null;
+}
+
 
 app.Run();
