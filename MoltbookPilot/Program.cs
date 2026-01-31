@@ -82,12 +82,11 @@ app.MapPost("/api/moltbook/join", async (
     MoltbookStateStore store,
     CancellationToken ct) =>
 {
-    var model = "your-model-id";
-    var resultText = await joinSvc.JoinAsync(model, ct);
+    var model = "qwen/qwen3-coder-30b";
+    var text = await joinSvc.JoinAsync(model, ct);
 
-    // Parse what we can from the text (claim url + key)
-    var claimUrl = ExtractFirstUrl(resultText);
-    var apiKey = ExtractApiKey(resultText);
+    var claimUrl = ExtractClaimUrl(text);
+    var apiKey = ExtractApiKey(text);
 
     if (!string.IsNullOrWhiteSpace(claimUrl))
         await store.SaveClaimAsync(claimUrl, ct);
@@ -95,10 +94,10 @@ app.MapPost("/api/moltbook/join", async (
     if (!string.IsNullOrWhiteSpace(apiKey))
         await store.SaveApiKeyAsync(apiKey, ct);
 
-    return Results.Ok(resultText);
+    return Results.Ok(text);
 });
 
-static string? ExtractFirstUrl(string text)
+static string? ExtractClaimUrl(string text)
 {
     var m = System.Text.RegularExpressions.Regex.Match(text, @"https?://\S+");
     return m.Success ? m.Value.TrimEnd(')', '.', ',', ';') : null;
@@ -106,8 +105,8 @@ static string? ExtractFirstUrl(string text)
 
 static string? ExtractApiKey(string text)
 {
-    // example patterns: "molt_" or "moltb_" etc—adjust once you see it
-    var m = System.Text.RegularExpressions.Regex.Match(text, @"\b(molt[a-zA-Z0-9_\-]{10,})\b");
+    // Adjust prefix if Moltbook’s key format differs in your output
+    var m = System.Text.RegularExpressions.Regex.Match(text, @"\b(moltbook_sk_[A-Za-z0-9_\-]+)\b");
     return m.Success ? m.Groups[1].Value : null;
 }
 
