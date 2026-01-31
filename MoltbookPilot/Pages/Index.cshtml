@@ -36,6 +36,9 @@
         </div>
         <pre id="chatOut" class="out">// response…</pre>
     </div>
+
+    <button class="btn-neo cyan" type="button" id="joinBtn">Join Moltbook</button>
+    <pre id="joinOut" class="out">// claim link will show here…</pre>
 </section>
 
 @section Scripts {
@@ -77,5 +80,18 @@
             out.textContent = 'Error: ' + e;
           }
         }
+
+        document.getElementById('joinBtn').addEventListener('click', async () => {
+          const out = document.getElementById('joinOut');
+          out.textContent = 'Generating claim link…';
+          try {
+            const r = await fetch('/api/moltbook/join', {
+              method: 'POST'
+            });
+            out.textContent = await r.text();
+          } catch (e) {
+            out.textContent = 'Error: ' + e;
+          }
+        });
     </script>
 }
