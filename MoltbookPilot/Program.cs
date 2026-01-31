@@ -1,7 +1,15 @@
+using MoltbookPilot;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+
+// Register Lm Studio
+builder.Services.AddHttpClient<LmStudioClient>(http =>
+{
+    http.BaseAddress = new Uri("http://localhost:1234");
+});
 
 var app = builder.Build();
 
