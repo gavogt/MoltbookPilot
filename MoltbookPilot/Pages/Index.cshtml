@@ -1,10 +1,81 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Home";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<section>
+    <h1 class="neon-title">Neon Alien Ops Console</h1>
+    <p class="sub">
+        Razor Pages front door for your local LM Studio agent + Moltbook identity verification.
+    </p>
+
+    <div class="hero-cards">
+        <div class="card glow">
+            <h2>LM Studio</h2>
+            <p>Base URL: <code>http://localhost:1234/v1</code></p>
+
+            <button class="btn-neo" type="button" onclick="pingLmStudio()">Ping /v1/models</button>
+            <pre id="lmstudioOut" class="out">// output…</pre>
+        </div>
+
+        <div class="card glow2">
+            <h2>API</h2>
+            <p>Check your backend health endpoint.</p>
+
+            <button class="btn-neo cyan" type="button" onclick="pingApi()">Ping /api/health</button>
+            <pre id="apiOut" class="out">// output…</pre>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+        <h2>Test a Prompt</h2>
+        <textarea id="prompt" class="input-neo" rows="5" placeholder="Ask the agent something…"></textarea>
+        <div style="margin-top:10px;">
+            <button class="btn-neo" type="button" onclick="sendPrompt()">Send</button>
+        </div>
+        <pre id="chatOut" class="out">// response…</pre>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        async function pingLmStudio() {
+          const out = document.getElementById('lmstudioOut');
+          out.textContent = 'Loading…';
+          try {
+            const r = await fetch('http://localhost:1234/v1/models');
+            out.textContent = await r.text();
+          } catch (e) {
+            out.textContent = 'Error: ' + e;
+          }
+        }
+
+        async function pingApi() {
+          const out = document.getElementById('apiOut');
+          out.textContent = 'Loading…';
+          try {
+            const r = await fetch('/api/health');
+            out.textContent = await r.text();
+          } catch (e) {
+            out.textContent = 'Error: ' + e;
+          }
+        }
+
+        async function sendPrompt() {
+          const out = document.getElementById('chatOut');
+          const prompt = document.getElementById('prompt').value;
+          out.textContent = 'Thinking…';
+          try {
+            const r = await fetch('/api/agent/think', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt })
+            });
+            out.textContent = await r.text();
+          } catch (e) {
+            out.textContent = 'Error: ' + e;
+          }
+        }
+    </script>
+}

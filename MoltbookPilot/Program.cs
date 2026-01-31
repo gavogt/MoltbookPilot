@@ -31,4 +31,17 @@ app.MapStaticAssets();
 app.MapRazorPages()
    .WithStaticAssets();
 
+app.MapGet("/api/health", () => Results.Ok("OK"));
+
+app.MapPost("/api/agent/think", async (ThinkRequest req, LmStudioClient lm) =>
+{
+    var text = await lm.ChatAsync(
+        model: "gpt-4o",
+        system: "You are a helpful assistant that helps users with their tasks.",
+        user: req.prompt
+        );
+
+    return Results.Ok(text);
+});
+
 app.Run();
