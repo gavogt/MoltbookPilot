@@ -22,6 +22,8 @@ builder.Services.AddScoped<MoltbookJoinService>();
 builder.Services.AddScoped<MoltbookStateStore>();
 builder.Services.AddScoped<MoltbookHeartbeatRunner>();
 builder.Services.AddHostedService<MoltbookHeartbeatHostedService>();
+builder.Services.AddControllers();
+builder.Services.AddScoped<MoltbookComposeService>();
 
 
 var app = builder.Build();
@@ -37,6 +39,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseRouting();
+app.MapControllers();
 
 app.UseAuthorization();
 

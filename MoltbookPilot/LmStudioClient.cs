@@ -42,5 +42,16 @@ namespace MoltbookPilot
             var msg = await CreateAsync(model, messages, tools: null, ct);
             return msg?.content ?? string.Empty;
         }
+
+        public async Task<string> ChatAsync(
+            string model,
+            List<ChatMessage> messages,
+            CancellationToken ct = default)
+            {
+                var msg = await CreateAsync(model, messages, tools: null, ct);
+                return msg?.content ?? string.Empty;
+            }
     }
+
+
 }

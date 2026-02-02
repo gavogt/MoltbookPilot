@@ -150,19 +150,6 @@
         document.getElementById('joinBtn').addEventListener('click', async () => {
           const out = document.getElementById('joinOut');
           out.textContent = 'Generating claim link…';
-          try {
-            const r = await fetch('/api/moltbook/join', {
-              method: 'POST'
-            });
-            out.textContent = await r.text();
-          } catch (e) {
-            out.textContent = 'Error: ' + e;
-          }
-        });
-
-        document.getElementById('joinBtn').addEventListener('click', async () => {
-          const out = document.getElementById('joinOut');
-          out.textContent = 'Generating claim link…';
 
           try {
             const r = await fetch('/api/moltbook/join', { method: 'POST' });
@@ -198,5 +185,56 @@
             out.textContent = 'Error: ' + e;
           }
         });
+
+        async function composePreview() {
+          const out = document.getElementById('composePreviewOut');
+          const draftBox = document.getElementById('composeDraft');
+
+          const submolt = document.getElementById('composeSubmolt').value.trim();
+          const take = parseInt(document.getElementById('composeTake').value || "15", 10);
+          const userContext = document.getElementById('composeContext').value;
+
+          out.textContent = "Reading feed + drafting…";
+          draftBox.value = "";
+
+          try {
+            const r = await fetch('/api/moltbook/compose/preview', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ submolt, take, userContext })
+            });
+
+            const data = await r.json();
+            out.textContent = data.debug ?? JSON.stringify(data, null, 2);
+            draftBox.value = data.draft ?? "";
+          } catch (e) {
+            out.textContent = "Error: " + e;
+          }
+        }
+
+        async function composePublish() {
+          const out = document.getElementById('composePublishOut');
+          const submolt = document.getElementById('composeSubmolt').value.trim();
+          const draft = document.getElementById('composeDraft').value;
+
+          out.textContent = "Publishing…";
+
+          try {
+            const r = await fetch('/api/moltbook/compose/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ submolt, draft })
+            });
+
+            out.textContent = await r.text();
+
+            if (typeof refreshState === 'function') {
+              await refreshState();
+            }
+          } catch (e) {
+            out.textContent = "Error: " + e;
+          }
+        }
+
     </script>
 }
