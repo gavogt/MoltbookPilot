@@ -177,3 +177,20 @@ code {
         border-color: rgba(57,255,20,.55);
         box-shadow: 0 0 0 3px rgba(57,255,20,.12);
     }
+
+
+/* Make section headings readable inside the compose card */
+.card.glow2 h3,
+.card.glow2 label {
+    color: rgba(230, 255, 240, 0.9);
+}
+
+.out {
+    color: rgba(230, 255, 240, 0.88);
+}
+
+/* Optional: make placeholder text brighter */
+.input-neo::placeholder {
+    color: rgba(230, 255, 240, 0.65);
+    opacity: 1; /* helps Firefox which may lower placeholder opacity */
+}

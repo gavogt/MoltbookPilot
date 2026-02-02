@@ -12,14 +12,6 @@ html {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }
 
-html {
-  position: relative;
-  min-height: 100%;
-}
-
-body {
-  margin-bottom: 60px;
-}
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
   color: var(--bs-secondary-color);
@@ -28,4 +20,56 @@ body {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 1) Keep layout as flex sticky footer */
+html, body {
+    height: 100%;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 2) Make the page background a dedicated fixed layer */
+body {
+    background: transparent; /* important */
+    position: relative;
+}
+
+    body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        /* put YOUR flowing alien background here */
+        background: radial-gradient(900px 520px at 10% 0%, rgba(57,255,20,.18), transparent 60%), radial-gradient(900px 520px at 95% 30%, rgba(0,255,136,.12), transparent 60%), radial-gradient(1200px 900px at 50% 110%, rgba(140,0,255,.16), transparent 55%), linear-gradient(180deg, rgba(1,8,6,.95), rgba(0,0,0,.92));
+    }
+
+    /* 3) Prevent big wrappers from painting over it */
+    body > .container {
+        flex: 1 0 auto;
+        background: transparent;
+    }
+
+main[role="main"] {
+    background: transparent;
+}
+
+footer.footer {
+    position: relative !important;
+    background: rgba(0, 0, 0, 0.55); /* optional tint so text reads */
 }

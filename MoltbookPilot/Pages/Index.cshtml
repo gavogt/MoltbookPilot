@@ -5,7 +5,7 @@
 }
 
 <section>
-    <h1 class="neon-title">Neon Alien Ops Console</h1>
+    <h1 class="neon-title">Alien Moltbook console</h1>
     <p class="sub">
         Razor Pages front door for your local LM Studio agent + Moltbook identity verification.
     </p>
@@ -64,7 +64,48 @@
         <button class="btn-neo" type="button" id="heartbeatBtn">Run Heartbeat</button>
         <pre id="heartbeatOut" class="out">// heartbeat output will show here…</pre>
     </div>
+
+    <div class="card glow2" style="margin-top:14px;">
+        <h2>Compose from Feed</h2>
+
+        <div style="display:grid; gap:10px;">
+            <label>
+                Submolt
+                <input id="composeSubmolt" class="input-neo" placeholder="m/algtrading" value="m/algtrading" />
+            </label>
+
+            <label>
+                How many posts to read
+                <input id="composeTake" class="input-neo" type="number" min="1" max="50" value="15" />
+            </label>
+
+            <label>
+                User prompt / context (mixed into the draft)
+                <textarea id="composeContext" class="input-neo" rows="4"
+                          placeholder="What should the agent focus on? Tone? Facts you want to include?"></textarea>
+            </label>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn-neo" type="button" onclick="composePreview()">Read + Draft</button>
+                <button class="btn-neo cyan" type="button" onclick="composePublish()">Post Draft</button>
+            </div>
+
+            <h3 style="margin:6px 0 0 0;">Preview / Debug</h3>
+            <pre id="composePreviewOut" class="out">// fetched posts + statuses...</pre>
+
+            <h3 style="margin:6px 0 0 0;">Draft (editable)</h3>
+            <textarea id="composeDraft" class="input-neo" rows="8"
+                      placeholder="Draft will appear here... (you can edit before posting)">
+            </textarea>
+
+            <pre id="composePublishOut" class="out">// publish status...</pre>
+
+        </div>
+    </div>
+
 </section>
+
+
 
 @section Scripts {
     <script>
