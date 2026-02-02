@@ -1,5 +1,5 @@
 # MoltbookPilot 👽🟢  
-Neon-themed **ASP.NET Core Razor Pages** “ops console” for running a **local LM Studio agent** that can register/verify on **Moltbook** and persist agent state in **SQL Server**.
+Neon-themed **ASP.NET Core Razor Pages** “ops console” for running a **local LM Studio agent** that can register/verify on **Moltbook**, read the feed, draft posts, and publish — while persisting agent state in **SQL Server**.
 
 > **Local-first:** This app talks to your locally-running LM Studio server (OpenAI-compatible `/v1` endpoints) and keeps secrets out of source control using **User Secrets**.
 
@@ -7,38 +7,60 @@ Neon-themed **ASP.NET Core Razor Pages** “ops console” for running a **local
 
 ## What it does
 
-- **LM Studio connectivity checks**
-  - Ping `GET /v1/models` on your local LM Studio server
-  - Send a prompt to your local model via `POST /v1/chat/completions`
-- **Moltbook onboarding**
-  - “Join Moltbook” flow that registers an agent and returns a **claim link**
-  - Store agent state (**handle, claim URL, API key, heartbeat timestamps**) in SQL Server
-- **Moltbook state dashboard**
+### LM Studio tools
+- **Connectivity checks**
+  - Ping `GET /v1/models`
+  - Send prompts via `POST /v1/chat/completions`
+
+### Moltbook onboarding + state
+- **Join / claim flow**
+  - “Join Moltbook” registers an agent and returns a **claim link**
+  - Saves agent state (**handle, claim URL, API key, heartbeat timestamps**) in SQL Server
+- **State dashboard**
   - View stored claim URL / masked API key
   - Refresh state from the backend
+
+### Heartbeats
+- **Manual heartbeat endpoint**
+  - `POST /api/moltbook/heartbeat` runs the heartbeat runner once
+- **Background hosted service**
+  - Periodic timer calls heartbeat runner (runner enforces the 4+ hour cadence)
+
+### Compose from Feed (new)
+- Read N recent posts from a submolt (e.g. `m/general`)
+- Mix them with your **User Context** and generate a **draft**
+- Edit the draft in the UI
+- Publish the draft to Moltbook
 
 ---
 
 ## Architecture (high level)
 
-- **Razor Pages UI**: `Pages/Index.cshtml` (“Neon Alien Ops Console”)
+- **Razor Pages UI**: `Pages/Index.cshtml` (Neon Alien Ops Console)
 - **LM Studio client**: `LmStudioClient` (OpenAI-compatible Chat Completions)
-- **Tool runtime**: `AgentTools` + tool-call loop (HTTP GET / POST JSON)
+- **Tool runtime**: `AgentTools` (safe HTTP GET/POST to moltbook.com only)
 - **Persistence**: `MoltbookAgentState` + `MoltbookDbContext` + `MoltbookStateStore`
-- **Endpoints** (typical):
-  - `GET /api/health`
+- **Services**
+  - `MoltbookJoinService` (onboarding)
+  - `MoltbookHeartbeatRunner` + `MoltbookHeartbeatHostedService` (heartbeat)
+  - `MoltbookComposeService` (feed → draft → publish)
+- **Endpoints** (typical)
+  - `GET  /api/health`
   - `POST /api/agent/think`
   - `POST /api/moltbook/join`
-  - `GET /api/moltbook/state`
+  - `GET  /api/moltbook/state`
+  - `POST /api/moltbook/heartbeat`
+  - `POST /api/moltbook/compose/preview` *(read posts + draft)*
+  - `POST /api/moltbook/compose/publish` *(publish draft)*
 
 ---
 
 ## Prerequisites
 
-- **.NET SDK** matching the project’s `TargetFramework` (e.g., `net9.0` or `net10.0`)
+- **.NET SDK** matching the project’s `TargetFramework` (e.g., `net9.0` / `net10.0`)
 - **LM Studio** installed and running with:
   - A model downloaded and loaded
-  - **Local Server** enabled (default: `http://localhost:1234/v1`)
+  - **Local Server** enabled (commonly `http://localhost:1234`)
 - **SQL Server** (any of):
   - SQL Server Express (`.\SQLEXPRESS`)
   - LocalDB (`(localdb)\MSSQLLocalDB`)
@@ -79,24 +101,27 @@ dotnet user-secrets set "ConnectionStrings:MoltbookPilotDb" "Server=.\SQLEXPRESS
 dotnet user-secrets set "ConnectionStrings:MoltbookPilotDb" "Server=(localdb)\MSSQLLocalDB;Database=MoltbookDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
 ```
 
-> Tip (PowerShell): If quoting gets annoying, wrap the connection string in single quotes.
-
-#### Optional secrets (recommended)
-
-If your code supports it, store these too:
+### 3) Optional config (recommended)
 
 ```bash
-dotnet user-secrets set "LmStudio:BaseUrl" "http://localhost:1234/v1"
-dotnet user-secrets set "Agent:Model" "your-local-model-id"
+dotnet user-secrets set "Agent:Model" "qwen/qwen3-coder-30b"
+dotnet user-secrets set "Moltbook:BaseUrl" "https://www.moltbook.com"
 ```
+
+Optional API path overrides (usually you do NOT need these unless Moltbook changes):
+```bash
+dotnet user-secrets set "Moltbook:FeedPath" "/api/v1/feed?limit={limit}"
+dotnet user-secrets set "Moltbook:SubmoltFeedPath" "/api/v1/posts?submolt={submolt}&limit={limit}"
+dotnet user-secrets set "Moltbook:CreatePostPath" "/api/v1/posts"
+```
+
+> Tip: Prefer `https://www.moltbook.com` to avoid redirects that can strip Authorization headers.
 
 ---
 
 ## Database setup
 
 ### Option A (recommended): EF Core migrations
-
-If you have EF Core tooling installed and working:
 
 ```bash
 dotnet ef migrations add InitMoltbookState -c MoltbookDbContext
@@ -105,17 +130,15 @@ dotnet ef database update -c MoltbookDbContext
 
 ### Option B: Create the table manually (SSMS)
 
-If you prefer to create the table yourself:
-
 ```sql
 CREATE TABLE dbo.MoltbookAgentState (
-    Id              INT IDENTITY(1,1) PRIMARY KEY,
-    AgentHandle     NVARCHAR(100) NULL,
-    ClaimUrl        NVARCHAR(400) NULL,
-    AgentApiKey     NVARCHAR(200) NULL,
+    Id               INT IDENTITY(1,1) PRIMARY KEY,
+    AgentHandle      NVARCHAR(100) NULL,
+    ClaimUrl         NVARCHAR(400) NULL,
+    AgentApiKey      NVARCHAR(200) NULL,
     LastHeartbeatUtc DATETIME2(0) NULL,
-    CreatedUtc      DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
-    UpdatedUtc      DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
+    CreatedUtc       DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedUtc       DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
 );
 ```
 
@@ -129,64 +152,57 @@ dotnet run
 
 Open the URL printed in the console (usually `https://localhost:xxxx`).
 
-On the home page you can:
-
-- **Ping LM Studio**: checks your local server
-- **Ping API**: checks your backend
-- **Test a Prompt**: sends a prompt to your local model
-- **Join Moltbook**: runs registration + returns claim link
-- **Refresh State**: reads state from SQL and displays it
-
 ---
 
-## Moltbook onboarding flow
+## Using the console
 
+### LM Studio
+- **Ping LM Studio** → checks `/v1/models`
+- **Test a Prompt** → sends prompt to `/v1/chat/completions`
+
+### Moltbook onboarding
 1. Click **Join Moltbook**
 2. The app should return:
    - a **claim URL**
    - an **API key**
-3. **Save** those values:
-   - API key: store in SQL +/or user secrets (do not commit to Git)
-4. Open the **claim URL** and complete verification (tweet/claim)
-5. After verification, proceed to heartbeat + posting routines
+3. Open the claim URL and complete verification
+4. Return to the console and confirm your Moltbook state shows the key (masked)
+
+### Heartbeats
+- Click **Run Heartbeat**
+- The runner will fetch Moltbook heartbeat instructions and execute them (subject to cadence enforcement)
+
+### Compose from Feed (new)
+1. Enter a submolt like `m/general` (or just `general`)
+2. Choose how many posts to read (e.g. 15)
+3. Add **User prompt / context** (tone, facts, what to focus on)
+4. Click **Read + Draft**
+5. Edit the draft (title on first line, blank line, then content)
+6. Click **Post Draft**
+
+---
+
+## Notes / gotchas
+
+- **Submolt formats**
+  - UI can accept `general`, `m/general`, or `/m/general`
+  - API calls should use the **slug** (`general`) when filtering/creating posts
+- **Rate limits**
+  - Posting may return `429 Too Many Requests` if you post too frequently. Handle gracefully and retry later.
+- **Prompt format**
+  - Drafting expects:
+    - First line = title only (no "TITLE:" prefix, no markdown)
+    - Blank line
+    - Body/content
 
 ---
 
 ## Security notes
 
-- **Never commit**:
+- **Never commit**
   - Moltbook API keys
   - Connection strings with credentials
-- Prefer **User Secrets** locally, environment variables/secret store in production.
-
----
-
-## Troubleshooting
-
-### “Join Moltbook” button does nothing
-- Open browser DevTools → **Console**
-  - Fix any JavaScript syntax errors (a single error can prevent handlers from attaching)
-- Check DevTools → **Network**
-  - Confirm `POST /api/moltbook/join` is firing
-
-### LM Studio ping fails from the browser
-Some environments block cross-origin calls from the browser to `http://localhost:1234`.
-If so, proxy the request through your ASP.NET backend (recommended) instead of calling LM Studio directly from the page.
-
-### EF Core tooling errors
-If `dotnet ef` errors out:
-- Confirm EF Core packages are referenced in the `.csproj`
-- Ensure the `dotnet-ef` tool version matches your EF Core package major version
-- Use the **manual SQL option** above as a fallback
-
----
-
-## Roadmap
-
-- Heartbeat runner endpoint (`POST /api/moltbook/heartbeat`)
-- Background service (runs heartbeat every ~4+ hours)
-- Post/comment endpoints driven by heartbeat instructions
-- Better redaction/masking in UI for sensitive values
+- Use **User Secrets** locally; use environment variables/secret store in production.
 
 ---
 
@@ -194,8 +210,5 @@ If `dotnet ef` errors out:
 
 Licensed under the Apache License, Version 2.0. See the `LICENSE` file for details.
 
-MoltbookPilot
+MoltbookPilot  
 Copyright (c) 2026 Gabriel Vogt
-
-This product includes software developed by contributors.
-Licensed under the Apache License, Version 2.0.
