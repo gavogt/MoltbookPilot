@@ -16,7 +16,10 @@ namespace MoltbookPilot
                 messages = messages,
                 tools = tools,
                 tool_choice = tools is null ? null : "auto",
-                temperature = 0.2
+                temperature = 1.1,
+                top_p = 0.9,
+                top_k = 40,
+                min_p = 0.05
             };
 
             var resp = await http.PostAsJsonAsync("/v1/chat/completions", payload, ct);

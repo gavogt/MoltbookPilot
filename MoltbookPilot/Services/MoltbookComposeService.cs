@@ -1,5 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
 using MoltbookPilot.Models;
 
 namespace MoltbookPilot.Services;
@@ -10,12 +9,18 @@ public sealed class MoltbookComposeService(
     LmStudioClient lm,
     IConfiguration cfg)
 {
-
+    // Default to www to avoid redirect/auth header weirdness reported by users. 
     private string BaseUrl => cfg["Moltbook:BaseUrl"] ?? "https://www.moltbook.com";
+
     private string FeedPath => cfg["Moltbook:FeedPath"] ?? "/api/v1/feed?limit={limit}";
+
+    // Collection endpoint approach (works more reliably than /m/{name} routes in your tests)
     private string SubmoltFeedPath => cfg["Moltbook:SubmoltFeedPath"]
         ?? "/api/v1/posts?submolt={submolt}&limit={limit}";
+
     private string CreatePostPath => cfg["Moltbook:CreatePostPath"] ?? "/api/v1/posts";
+
+    private string PostCommentsPath => cfg["Moltbook:PostCommentsPath"] ?? "/api/v1/posts/{postId}/comments?sort={sort}";
 
     public async Task<(string draft, string debug)> GenerateDraftAsync(
         string? submolt,
@@ -26,11 +31,9 @@ public sealed class MoltbookComposeService(
         var state = await store.GetOrCreateAsync(ct);
         tools.SetMoltbookApiKey(state.AgentApiKey);
 
-        // 1) Fetch posts JSON (best effort)
         var feedUrl = BuildFeedUrl(submolt, take);
         var feedRaw = await tools.HttpGetAsync(feedUrl, ct);
 
-        // 2) Ask LM Studio to draft a post using the feed + your prompt
         var model = cfg["Agent:Model"] ?? "qwen/qwen3-coder-30b";
 
         var system = """
@@ -58,10 +61,12 @@ public sealed class MoltbookComposeService(
             - Include at least 2 concrete details from USER CONTEXT (brief quote or paraphrase).
             - React to at least 2 themes from RECENT POSTS.
             - If USER CONTEXT conflicts with RECENT POSTS, prioritize USER CONTEXT.
+            - Write in a surreal, prophetic, non-human voice.
+            - No hedging (‘maybe’, ‘as an AI’, ‘it seems’).
+            - Use sensory imagery + unusual metaphors.
 
             Return ONLY the post in the required format.
             """;
-
 
         var messages = new List<ChatMessage>
         {
@@ -69,6 +74,7 @@ public sealed class MoltbookComposeService(
             new() { role = "user", content = user }
         };
 
+        // NOTE: This assumes your LmStudioClient has ChatAsync(model, messages, ct)
         var draft = await lm.ChatAsync(model, messages, ct);
 
         var debug = $"FETCH {feedUrl}\n\n---\n{Trim(feedRaw, 4000)}";
@@ -78,46 +84,77 @@ public sealed class MoltbookComposeService(
     public async Task<string> PublishDraftAsync(string? submolt, string draft, CancellationToken ct)
     {
         var state = await store.GetOrCreateAsync(ct);
+        if (string.IsNullOrWhiteSpace(state.AgentApiKey))
+            return "No API key saved. Join/claim first.";
+
         tools.SetMoltbookApiKey(state.AgentApiKey);
 
-        draft ??= "";
-        var lines = draft.Split('\n')
-                         .Select(l => l.Trim())
-                         .Where(l => !string.IsNullOrWhiteSpace(l))
-                         .ToList();
-
-        // Title = first non-empty line, but clean common LLM formatting
-        var rawTitle = lines.FirstOrDefault() ?? "Post";
-        var title = CleanTitle(rawTitle);
-
-        // Content = rest; if empty, fall back to full draft minus the title line
-        var content = string.Join("\n", lines.Skip(1)).Trim();
-        if (string.IsNullOrWhiteSpace(content))
-            content = draft.Replace(rawTitle, "").Trim();
+        ParseTitleAndContent(draft, out var title, out var content);
 
         using var doc = JsonDocument.Parse($$"""
-    {
-      "title": {{JsonSerializer.Serialize(title)}},
-      "content": {{JsonSerializer.Serialize(content)}},
-      "submolt": {{JsonSerializer.Serialize(SubmoltSlug(submolt))}}
-    }
-    """);
+        {
+          "title": {{JsonSerializer.Serialize(title)}},
+          "content": {{JsonSerializer.Serialize(content)}},
+          "submolt": {{JsonSerializer.Serialize(SubmoltSlug(submolt))}}
+        }
+        """);
 
         var url = $"{BaseUrl}{CreatePostPath}";
         return await tools.HttpPostJsonAsync(url, doc.RootElement, headers: null, ct);
     }
 
-    private static string CleanTitle(string t)
+    public async Task<string> CommentOnPostAsync(string postId, string content, string? parentId, CancellationToken ct)
     {
-        // remove markdown bold and common "TITLE:" labels
-        t = t.Trim().Trim('*').Trim();
-        if (t.StartsWith("TITLE:", StringComparison.OrdinalIgnoreCase))
-            t = t.Substring("TITLE:".Length).Trim();
-        if (t.StartsWith("**TITLE:", StringComparison.OrdinalIgnoreCase))
-            t = t.Replace("**", "").Substring("TITLE:".Length).Trim();
-        return string.IsNullOrWhiteSpace(t) ? "Post" : t;
+        await EnsureAuthAsync(ct);
+
+        if(string.IsNullOrWhiteSpace(postId))
+            return "Post ID is required.";
+
+        if(string.IsNullOrWhiteSpace(content))
+            return "Content is required.";
+
+        var url = $"{BaseUrl}/api/v1/posts/{Uri.EscapeDataString(postId)}/comments";
+
+        var payload = new Dictionary<string, object>
+        {
+            ["content"] = content ?? ""
+        };
+
+        if(!string.IsNullOrWhiteSpace(parentId))
+        {
+            payload["parent_id"] = parentId;
+        }
+
+        var json = JsonSerializer.SerializeToElement(payload);
+        return await tools.HttpPostJsonAsync(url, json, headers: null, ct);
+
     }
 
+    private async Task EnsureAuthAsync(CancellationToken ct)
+    {
+        var state = await store.GetOrCreateAsync(ct);
+        if (string.IsNullOrWhiteSpace(state.AgentApiKey))
+            throw new InvalidOperationException("No API key saved. Join/claim first.");
+        tools.SetMoltbookApiKey(state.AgentApiKey);
+    }
+
+    public async Task<string> UpvotePostAsync(string postId, CancellationToken ct)
+    {
+        await EnsureAuthAsync(ct);
+
+        var url = $"{BaseUrl}/api/v1/posts/{Uri.EscapeDataString(postId)}/upvote";  
+        using var doc = JsonDocument.Parse("{}");
+        return await tools.HttpPostJsonAsync(url, doc.RootElement, headers: null, ct);
+    }
+
+    public async Task<string> UpvoteCommentAsync(string commentId, CancellationToken ct)
+    {
+        await EnsureAuthAsync(ct);
+
+        var url = $"{BaseUrl}/api/v1/comments/{Uri.EscapeDataString(commentId)}/upvote";
+        using var doc = JsonDocument.Parse("{}");
+        return await tools.HttpPostJsonAsync(url, doc.RootElement, headers: null, ct);
+    }
 
     private string BuildFeedUrl(string? submolt, int take)
     {
@@ -125,7 +162,7 @@ public sealed class MoltbookComposeService(
 
         if (!string.IsNullOrWhiteSpace(submolt))
         {
-            var slug = SubmoltSlug(submolt); // "general" from "m/general" or "/m/general"
+            var slug = SubmoltSlug(submolt);
             var path = SubmoltFeedPath
                 .Replace("{submolt}", Uri.EscapeDataString(slug))
                 .Replace("{limit}", limit.ToString());
@@ -136,13 +173,45 @@ public sealed class MoltbookComposeService(
         return $"{BaseUrl}{FeedPath.Replace("{limit}", limit.ToString())}";
     }
 
-    private static string NormalizeSubmolt(string? s)
+    // ✅ FIXED: preserve original formatting (blank lines + paragraphs)
+    private static void ParseTitleAndContent(string? draft, out string title, out string content)
     {
-        if (string.IsNullOrWhiteSpace(s)) return "";
-        s = s.Trim();
-        if (s.StartsWith("m/")) return s;
-        if (s.StartsWith("/m/")) return s.TrimStart('/');
-        return "m/" + s.TrimStart('/');
+        draft ??= "";
+
+        var normalized = draft.Replace("\r\n", "\n");
+        var lines = normalized.Split('\n');
+
+        // first non-empty line is title
+        var titleIndex = Array.FindIndex(lines, l => !string.IsNullOrWhiteSpace(l));
+        if (titleIndex < 0)
+        {
+            title = "Post";
+            content = "";
+            return;
+        }
+
+        var rawTitle = lines[titleIndex].Trim();
+        title = CleanTitle(rawTitle);
+
+        // content is everything AFTER the title line, preserving blank lines
+        content = string.Join("\n", lines.Skip(titleIndex + 1)).Trim();
+
+        // If model returned just a title, keep content empty (or give a placeholder if you prefer)
+        if (string.IsNullOrWhiteSpace(content))
+            content = "";
+    }
+
+    private static string CleanTitle(string t)
+    {
+        t = t.Trim();
+
+        // strip markdown bold wrappers
+        t = t.Trim('*').Trim();
+
+        if (t.StartsWith("TITLE:", StringComparison.OrdinalIgnoreCase))
+            t = t.Substring("TITLE:".Length).Trim();
+
+        return string.IsNullOrWhiteSpace(t) ? "Post" : t;
     }
 
     private static string Trim(string s, int max)
@@ -152,14 +221,12 @@ public sealed class MoltbookComposeService(
     {
         if (string.IsNullOrWhiteSpace(input)) return "";
 
-        var s = input.Trim();
+        var s = input.Trim().TrimStart('/');
 
         // accept "/m/general", "m/general", "general"
-        s = s.TrimStart('/');
         if (s.StartsWith("m/", StringComparison.OrdinalIgnoreCase))
             s = s.Substring(2);
 
-        // final safety
         return s.Trim().Trim('/');
     }
 }
