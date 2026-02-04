@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MoltbookPilot.Data;
 
@@ -11,9 +12,11 @@ using MoltbookPilot.Data;
 namespace MoltbookPilot.Migrations
 {
     [DbContext(typeof(MoltbookDbContext))]
-    partial class MoltbookDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260204015334_Comments3")]
+    partial class Comments3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

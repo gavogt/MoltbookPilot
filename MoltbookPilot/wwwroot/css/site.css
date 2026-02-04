@@ -73,3 +73,22 @@ footer.footer {
     position: relative !important;
     background: rgba(0, 0, 0, 0.55); /* optional tint so text reads */
 }
+
+/* Readable text on dark surfaces */
+.readable-on-dark {
+    color: rgba(255,255,255,.92);
+}
+
+    .readable-on-dark .muted {
+        color: rgba(255,255,255,.72);
+    }
+
+    .readable-on-dark a {
+        color: rgba(180,255,210,.95);
+        text-decoration: underline;
+    }
+
+    .readable-on-dark code,
+    .readable-on-dark pre {
+        color: rgba(255,255,255,.92);
+    }

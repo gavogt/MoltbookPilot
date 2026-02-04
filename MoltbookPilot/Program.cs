@@ -12,18 +12,24 @@ builder.Services.AddRazorPages();
 builder.Services.AddHttpClient<LmStudioClient>(http =>
 {
     http.BaseAddress = new Uri("http://localhost:1234");
+    http.Timeout = TimeSpan.FromMinutes(10);
 });
 
 builder.Services.AddDbContext<MoltbookDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MoltbookPilotDb")));
 
-builder.Services.AddHttpClient<AgentTools>();
+builder.Services.AddHttpClient<AgentTools>(http =>
+{
+    http.Timeout = TimeSpan.FromMinutes(10); // was 100s default
+});
 builder.Services.AddScoped<MoltbookJoinService>();
 builder.Services.AddScoped<MoltbookStateStore>();
 builder.Services.AddScoped<MoltbookHeartbeatRunner>();
 builder.Services.AddHostedService<MoltbookHeartbeatHostedService>();
+builder.Services.AddHostedService<MoltbookEngagementHostedService>();
 builder.Services.AddControllers();
 builder.Services.AddScoped<MoltbookComposeService>();
+builder.Services.AddSingleton<EngagementStatusStore>();
 
 
 var app = builder.Build();

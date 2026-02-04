@@ -10,5 +10,15 @@ namespace MoltbookPilot.Data
         }
 
         public DbSet<MoltbookAgentState> MoltbookAgentStates => Set<MoltbookAgentState>();
+        public DbSet<ProcessedComment> ProcessedComments => Set<ProcessedComment>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<ProcessedComment>()
+                .HasIndex(x => x.CommentId)
+                .IsUnique();
+        }
     }
 }

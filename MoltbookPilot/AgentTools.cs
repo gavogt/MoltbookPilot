@@ -35,14 +35,18 @@ public sealed class AgentTools(HttpClient http)
         using var resp = await http.SendAsync(req, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
 
-        return $"Status: {(int)resp.StatusCode}\n{Trim(body)}";
+        // If not success, throw with the body so your UI/debug can show it
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"GET {(int)resp.StatusCode}: {body}");
+
+        return body;
     }
 
     public async Task<string> HttpPostJsonAsync(
-     string url,
-     JsonElement jsonBody,
-     Dictionary<string, string>? headers,
-     CancellationToken ct)
+        string url,
+        JsonElement jsonBody,
+        Dictionary<string, string>? headers,
+        CancellationToken ct)
     {
         var target = NormalizeMoltbookUrl(url);
         EnsureAllowed(target.ToString());
@@ -63,7 +67,10 @@ public sealed class AgentTools(HttpClient http)
         using var resp = await http.SendAsync(req, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
 
-        return $"Status: {(int)resp.StatusCode}\n{Trim(body)}";
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"POST {(int)resp.StatusCode}: {body}");
+
+        return body;
     }
 
     private static string Trim(string s)
@@ -71,7 +78,7 @@ public sealed class AgentTools(HttpClient http)
 
     private void AddMoltbookAuthIfNeeded(HttpRequestMessage req)
     {
-        if (_moltbookAgentApiKey is null) return;
+        if (string.IsNullOrWhiteSpace(_moltbookAgentApiKey)) return;
 
         var host = req.RequestUri?.Host?.ToLowerInvariant();
 

@@ -100,6 +100,47 @@
 
             <pre id="composePublishOut" class="out">// publish status...</pre>
 
+            <div class="readable-on-dark" style="padding:12px;border:1px solid #333;border-radius:8px;margin-bottom:12px;">
+                <div><b>PostId:</b> @Model.PostId</div>
+                <div><b>Interval:</b> @Model.IntervalMinutes minutes</div>
+
+                <div style="margin-top:10px;display:flex;gap:8px;">
+                    <button class="btn btn-sm btn-light" id="runOnce">Run Engage Now</button>
+                    <button class="btn btn-sm btn-light" id="refreshThread">Refresh Thread (JSON)</button>
+                </div>
+
+                <pre id="result" style="margin-top:10px;white-space:pre-wrap;"></pre>
+            </div>
+
+            <h2>Processed Comments (DB)</h2>
+
+            @if (Model.RecentProcessed.Count == 0)
+            {
+                <p>No processed comments yet.</p>
+            }
+            else
+            {
+                <table class="readable-on-dark" style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;border-bottom:1px solid #444;padding:6px;">RepliedUtc</th>
+                            <th style="text-align:left;border-bottom:1px solid #444;padding:6px;">PostId</th>
+                            <th style="text-align:left;border-bottom:1px solid #444;padding:6px;">CommentId</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.RecentProcessed)
+                        {
+                            <tr>
+                                <td style="border-bottom:1px solid #222;padding:6px;">@row.RepliedUtc.ToString("u")</td>
+                                <td style="border-bottom:1px solid #222;padding:6px;">@row.PostId</td>
+                                <td style="border-bottom:1px solid #222;padding:6px;">@row.CommentId</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
         </div>
     </div>
 
@@ -212,6 +253,8 @@
           }
         }
 
+
+
         async function composePublish() {
           const out = document.getElementById('composePublishOut');
           const submolt = document.getElementById('composeSubmolt').value.trim();
@@ -235,6 +278,21 @@
             out.textContent = "Error: " + e;
           }
         }
+
+        const resultEl = document.getElementById("result");
+
+        document.getElementById("runOnce").addEventListener("click", async () => {
+            resultEl.textContent = "Running engage...";
+            const r = await fetch("/api/moltbook/engage/run-once", { method: "POST" });
+            resultEl.textContent = await r.text();
+        });
+
+        document.getElementById("refreshThread").addEventListener("click", async () => {
+            resultEl.textContent = "Fetching thread...";
+            const r = await fetch("/api/moltbook/engage/thread");
+            const json = await r.json();
+            resultEl.textContent = JSON.stringify(json, null, 2);
+        });
 
     </script>
 }
