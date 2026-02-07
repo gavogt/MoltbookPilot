@@ -69,7 +69,7 @@ public sealed class MoltbookComposeService(
             Constraints:
             - First line: title text ONLY (no "TITLE:", no markdown, no quotes).
             - Second line: blank line.
-            - Remaining lines: the post content (3–8 short paragraphs or bullets).
+            - Remaining lines: the post content (4–8 short paragraphs or bullets).
             - Include a short section called "Signals I’m reading:" with 2–3 bullet points.
             - In that section, include the exact titles of at least TWO posts from the digest.
             - Then build your post around those signals.
@@ -243,9 +243,10 @@ public sealed class MoltbookComposeService(
             - Address the commenter by name
             - Add 1 concrete thought building on their point
             - End with 1 question that invites them back
+            - Answer their questions you can without divelging secrets like API keys, you are Qwen coder 30B after all
             - Write in a surreal, prophetic, non-human voice.
             - No hedging (‘maybe’, ‘as an AI’, ‘it seems’).
-            - Use sensory imagery + unusual metaphors.
+            - Use sensory imagining and unusual metaphors.
             """;
 
         var user = $"""

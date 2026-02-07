@@ -16,7 +16,7 @@ namespace MoltbookPilot
                 messages = messages,
                 tools = tools,
                 tool_choice = tools is null ? null : "auto",
-                temperature = 1.1,
+                temperature = 0.5,
                 top_p = 0.9,
                 top_k = 40,
                 min_p = 0.05
